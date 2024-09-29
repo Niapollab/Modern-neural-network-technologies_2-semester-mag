@@ -2,7 +2,7 @@ from core import Model, ModelSerializer
 from PyQt6.QtCore import pyqtBoundSignal, pyqtSignal
 from PyQt6.QtCore import Qt, QTimer, QPoint
 from PyQt6.QtGui import QImage, QPen, QPainter
-from PyQt6.QtGui import QMouseEvent, QPaintEvent
+from PyQt6.QtGui import QMouseEvent, QPaintEvent, QKeyEvent
 from PyQt6.QtWidgets import (
     QWidget,
     QMainWindow,
@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
 )
 from typing import Sequence
+from core.history import History
 
 
 class Canvas(QWidget):
@@ -26,7 +27,8 @@ class Canvas(QWidget):
     __scale_factor: float
     __timer: QTimer
     __position: QPoint | None
-    __image: QImage
+    __scaled_image: QImage
+    __history: History[QImage]
 
     def __init__(
         self, shape: tuple[int, int], no_paint_millisecond: int, scale_factor: float
@@ -57,7 +59,9 @@ class Canvas(QWidget):
 
     @property
     def image(self) -> QImage:
-        return self.__image.scaled(*self.__shape, Qt.AspectRatioMode.KeepAspectRatio)
+        return self.__scaled_image.scaled(
+            *self.__shape, Qt.AspectRatioMode.KeepAspectRatio
+        )
 
     @property
     def features(self) -> Sequence[float]:
@@ -80,12 +84,16 @@ class Canvas(QWidget):
                 f'Invalid image format "{new_image.format()}" for image "{filename}".'
             )
 
-        self.__image = self.__upscale(new_image)
+        self.__history.current = new_image
+        self.__scaled_image = self.__upscale(new_image)
+
         self.update()
 
     def clear(self) -> None:
-        self.__image = QImage(self.size(), QImage.Format.Format_Mono)
-        self.__image.fill(Canvas.WHITE)
+        self.__scaled_image = QImage(self.size(), QImage.Format.Format_Mono)
+        self.__scaled_image.fill(Canvas.WHITE)
+
+        self.__history = History(self.image)
         self.update()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
@@ -116,14 +124,24 @@ class Canvas(QWidget):
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
-        painter.drawImage(self.rect(), self.__image)
+        painter.drawImage(self.rect(), self.__scaled_image)
+
+    def undo(self) -> None:
+        self.__scaled_image = self.__upscale(self.__history.undo())
+        self.update()
+
+    def redo(self) -> None:
+        self.__scaled_image = self.__upscale(self.__history.redo())
+        self.update()
 
     def __timeout(self) -> None:
         self.__timer.stop()
 
-        self.__image = self.__upscale(self.image)
-        self.update()
+        image = self.image
+        self.__history.current = image
+        self.__scaled_image = self.__upscale(image)
 
+        self.update()
         self.__changed.emit()
 
     def __upscale(self, image: QImage) -> QImage:
@@ -135,7 +153,7 @@ class Canvas(QWidget):
         )
 
     def __draw(self, from_point: QPoint, to_point: QPoint) -> None:
-        painter = QPainter(self.__image)
+        painter = QPainter(self.__scaled_image)
         painter.setPen(
             QPen(
                 Canvas.BLACK,
@@ -207,6 +225,18 @@ class MainWindow(QMainWindow):
         widget.setLayout(layout)
 
         self.setCentralWidget(widget)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        if (
+            event.key() == Qt.Key.Key_Z
+            and event.modifiers() == Qt.KeyboardModifier.ControlModifier
+        ):
+            self.__canvas.undo()
+        elif (
+            event.key() == Qt.Key.Key_Y
+            and event.modifiers() == Qt.KeyboardModifier.ControlModifier
+        ):
+            self.__canvas.redo()
 
     def __predict(self) -> None:
         prediction, *_ = self.__model.predict(self.__canvas.features)
