@@ -9,7 +9,7 @@ if __name__ == "__main__":
     main_window = MainWindow(
         serializer=model_serializer,
         shape=(64, 64),
-        no_paint_millisecond=1000,
+        no_paint_millisecond=750,
         scale_factor=4,
     )
     main_window.show()

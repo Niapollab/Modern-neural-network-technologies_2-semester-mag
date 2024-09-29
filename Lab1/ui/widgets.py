@@ -3,7 +3,15 @@ from PyQt6.QtCore import pyqtBoundSignal, pyqtSignal
 from PyQt6.QtCore import Qt, QTimer, QPoint
 from PyQt6.QtGui import QImage, QPen, QPainter
 from PyQt6.QtGui import QMouseEvent, QPaintEvent
-from PyQt6.QtWidgets import QWidget, QMainWindow, QVBoxLayout
+from PyQt6.QtWidgets import (
+    QWidget,
+    QMainWindow,
+    QVBoxLayout,
+    QGroupBox,
+    QLabel,
+    QHBoxLayout,
+    QPushButton,
+)
 from typing import Sequence
 
 
@@ -12,6 +20,7 @@ class Canvas(QWidget):
     WHITE = 0xFFFFFFFF
 
     __changed: pyqtSignal = pyqtSignal()
+    __mouse_move: pyqtSignal = pyqtSignal(QPoint)
 
     __shape: tuple[int, int]
     __scale_factor: float
@@ -23,6 +32,7 @@ class Canvas(QWidget):
         self, shape: tuple[int, int], no_paint_millisecond: int, scale_factor: float
     ) -> None:
         super().__init__()
+        self.setMouseTracking(True)
 
         self.__shape = shape
         width, height = shape
@@ -35,12 +45,15 @@ class Canvas(QWidget):
         self.__timer.setInterval(no_paint_millisecond)
         self.__timer.timeout.connect(self.__timeout)
 
-        self.__image = QImage(self.size(), QImage.Format.Format_Mono)
-        self.__image.fill(Canvas.WHITE)
+        self.clear()
 
     @property
     def changed(self) -> pyqtBoundSignal:
         return self.__changed
+
+    @property
+    def mouse_move(self) -> pyqtBoundSignal:
+        return self.__mouse_move
 
     @property
     def image(self) -> QImage:
@@ -70,6 +83,11 @@ class Canvas(QWidget):
         self.__image = self.__upscale(new_image)
         self.update()
 
+    def clear(self) -> None:
+        self.__image = QImage(self.size(), QImage.Format.Format_Mono)
+        self.__image.fill(Canvas.WHITE)
+        self.update()
+
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.buttons() is Qt.MouseButton.LeftButton:
             self.__position = event.position().toPoint()
@@ -79,11 +97,16 @@ class Canvas(QWidget):
             self.__position = None
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        next_position = event.position().toPoint()
+
+        x, y = next_position.x(), next_position.y()
+        if x >= 0 and y >= 0 and x < self.width() and y < self.height():
+            self.__mouse_move.emit(next_position)
+
         if self.__position is None or event.buttons() != Qt.MouseButton.LeftButton:
             self.__position = None
             return
 
-        next_position = event.position().toPoint()
         self.__draw(self.__position, next_position)
 
         self.__position = next_position
@@ -125,6 +148,35 @@ class Canvas(QWidget):
         painter.drawLine(from_point, to_point)
 
 
+class CanvasWithInfo(QGroupBox):
+    __info: QLabel
+
+    def __init__(self, canvas: Canvas) -> None:
+        super().__init__()
+        self.setTitle("Canvas")
+
+        canvas.mouse_move.connect(self.__mouse_move_in_canvas)
+
+        self.__info = QLabel()
+        clean_button = QPushButton("Clean")
+        clean_button.clicked.connect(canvas.clear)
+
+        main_layout = QVBoxLayout()
+        layout = QHBoxLayout()
+
+        layout.addWidget(self.__info)
+        layout.addWidget(clean_button)
+
+        main_layout.addWidget(canvas)
+        main_layout.addLayout(layout)
+
+        self.setLayout(main_layout)
+        self.__mouse_move_in_canvas(QPoint(0, 0))
+
+    def __mouse_move_in_canvas(self, point: QPoint) -> None:
+        self.__info.setText(f"x: {point.x()}, y: {point.y()}")
+
+
 class MainWindow(QMainWindow):
     __canvas: Canvas
     __model: Model
@@ -149,7 +201,7 @@ class MainWindow(QMainWindow):
         self.__canvas.changed.connect(self.__predict)
 
         layout = QVBoxLayout()
-        layout.addWidget(self.__canvas)
+        layout.addWidget(CanvasWithInfo(self.__canvas))
 
         widget = QWidget()
         widget.setLayout(layout)
