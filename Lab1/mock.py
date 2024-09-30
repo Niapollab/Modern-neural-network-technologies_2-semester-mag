@@ -10,7 +10,7 @@ class RosenblattNeuron(Model):
     def evaluate(
         self, input: Sequence[float], expected_output: Sequence[float]
     ) -> None:
-        raise NotImplementedError()
+        pass
 
 
 class RosenblattNeuronSerializer(ModelSerializer[RosenblattNeuron]):

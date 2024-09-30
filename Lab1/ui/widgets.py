@@ -185,6 +185,7 @@ class CanvasWithInfo(QGroupBox):
         layout.addWidget(self.__info)
         layout.addWidget(clean_button)
 
+        main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(canvas)
         main_layout.addLayout(layout)
 
@@ -195,10 +196,111 @@ class CanvasWithInfo(QGroupBox):
         self.__info.setText(f"x: {point.x()}, y: {point.y()}")
 
 
+class ModelInfo(QGroupBox):
+    __serializer: ModelSerializer
+    __threshold: float
+    __variants: tuple[str, str]
+    __model: Model
+    __raw_info: QLabel
+    __last_input: Sequence[float]
+    __last_prediction: float
+    __correct_button: QPushButton
+    __incorrect_button: QPushButton
+
+    def __init__(
+        self,
+        serializer: ModelSerializer,
+        threshold: float,
+        variants: tuple[str, str],
+    ) -> None:
+        super().__init__()
+        self.setTitle("Model")
+
+        self.__threshold = threshold
+        self.__variants = variants
+
+        self.__serializer = serializer
+        self.__model = serializer.build()
+
+        self.__info = QLabel()
+        self.__info.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        font = self.__info.font()
+        font.setPointSize(72)
+        self.__info.setFont(font)
+
+        self.__raw_info = QLabel()
+        self.__raw_info.setFixedHeight(25)
+        self.__raw_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.__last_prediction = 0.0
+        self.__update_prediction()
+
+        main_layout = QVBoxLayout()
+        layout = QHBoxLayout()
+
+        self.__correct_button = QPushButton("✓")
+        self.__incorrect_button = QPushButton("X")
+
+        self.__correct_button.clicked.connect(self.__evaluate_correct)
+        self.__incorrect_button.clicked.connect(self.__evaluate_incorrect)
+
+        for button in (self.__correct_button, self.__incorrect_button):
+            button.setFixedHeight(30)
+            button.setEnabled(False)
+
+        layout.addWidget(self.__correct_button)
+        layout.addWidget(self.__incorrect_button)
+
+        main_layout.addWidget(self.__info)
+        main_layout.addWidget(self.__raw_info)
+        main_layout.addLayout(layout)
+
+        self.setLayout(main_layout)
+
+    @property
+    def output(self) -> float:
+        return 1.0 if self.__last_prediction >= self.__threshold else 0.0
+
+    @property
+    def variant(self) -> str:
+        return (
+            self.__variants[1]
+            if self.__last_prediction >= self.__threshold
+            else self.__variants[0]
+        )
+
+    def predict(self, input: Sequence[float]) -> None:
+        self.__correct_button.setEnabled(True)
+        self.__incorrect_button.setEnabled(True)
+
+        prediction, *_ = self.__model.predict(input)
+
+        self.__last_input = input
+        self.__last_prediction = prediction
+
+        self.__update_prediction()
+
+    def __update_prediction(self) -> None:
+        self.__info.setText(f"{self.variant}")
+        self.__raw_info.setText(f"Prediction: {self.__last_prediction:.2f}")
+
+    def __evaluate_correct(self) -> None:
+        expected_output = self.output
+        self.__model.evaluate(self.__last_input, [expected_output])
+
+        self.predict(self.__last_input)
+
+    def __evaluate_incorrect(self) -> None:
+        expected_output = 1.0 - self.output
+        self.__model.evaluate(self.__last_input, [expected_output])
+
+        self.predict(self.__last_input)
+
+
 class MainWindow(QMainWindow):
     __canvas: Canvas
-    __model: Model
-    __serializer: ModelSerializer
+    __model_info: ModelInfo
     __shape: tuple[int, int]
 
     def __init__(
@@ -207,19 +309,19 @@ class MainWindow(QMainWindow):
         shape: tuple[int, int],
         no_paint_millisecond: int,
         scale_factor: float,
+        threshold: float,
+        variants: tuple[str, str],
     ) -> None:
         super().__init__()
         self.setWindowTitle("Rosenblatt Neuron Emulator")
 
-        self.__shape = shape
-        self.__serializer = serializer
-        self.__model = serializer.build()
-
-        self.__canvas = Canvas(self.__shape, no_paint_millisecond, scale_factor)
+        self.__model_info = ModelInfo(serializer, threshold, variants)
+        self.__canvas = Canvas(shape, no_paint_millisecond, scale_factor)
         self.__canvas.changed.connect(self.__predict)
 
-        layout = QVBoxLayout()
+        layout = QHBoxLayout()
         layout.addWidget(CanvasWithInfo(self.__canvas))
+        layout.addWidget(self.__model_info)
 
         widget = QWidget()
         widget.setLayout(layout)
@@ -239,5 +341,4 @@ class MainWindow(QMainWindow):
             self.__canvas.redo()
 
     def __predict(self) -> None:
-        prediction, *_ = self.__model.predict(self.__canvas.features)
-        print(f"Prediction: {prediction}")
+        self.__model_info.predict(self.__canvas.features)

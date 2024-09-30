@@ -11,6 +11,8 @@ if __name__ == "__main__":
         shape=(64, 64),
         no_paint_millisecond=750,
         scale_factor=4,
+        threshold=0.5,
+        variants=(":)", ":("),
     )
     main_window.show()
 
