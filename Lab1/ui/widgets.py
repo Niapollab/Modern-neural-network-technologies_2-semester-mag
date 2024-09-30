@@ -1,6 +1,14 @@
 from core import Model, ModelSerializer
 from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtBoundSignal, pyqtSignal
-from PyQt6.QtGui import QImage, QPen, QPainter, QMouseEvent, QPaintEvent, QShortcut, QKeySequence
+from PyQt6.QtGui import (
+    QImage,
+    QPen,
+    QPainter,
+    QMouseEvent,
+    QPaintEvent,
+    QShortcut,
+    QKeySequence
+)
 from PyQt6.QtWidgets import (
     QWidget,
     QMainWindow,
@@ -9,6 +17,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QHBoxLayout,
     QPushButton,
+    QFileDialog,
 )
 from typing import Sequence
 from core.history import History
@@ -172,14 +181,17 @@ class Canvas(QWidget):
 
 class CanvasWithInfo(QGroupBox):
     __info: QLabel
+    __canvas: Canvas
+    __current_canvas: int
 
     def __init__(self, canvas: Canvas) -> None:
         super().__init__()
         self.setTitle("Canvas")
 
-        canvas.mouse_move.connect(self.__mouse_move_in_canvas)
-
+        self.__current_canvas = 0
         self.__info = QLabel()
+        self.__canvas = canvas
+
         clean_button = QPushButton("Clean")
         clean_button.clicked.connect(canvas.clear)
 
@@ -194,14 +206,43 @@ class CanvasWithInfo(QGroupBox):
         main_layout.addLayout(layout)
 
         self.setLayout(main_layout)
+
+        open_shrotcut = QShortcut(QKeySequence("Ctrl+O"), self)
+        open_shrotcut.activated.connect(self.__open)
+
+        save_shrotcut = QShortcut(QKeySequence("Ctrl+S"), self)
+        save_shrotcut.activated.connect(self.__save)
+
+        canvas.mouse_move.connect(self.__mouse_move_in_canvas)
         self.__mouse_move_in_canvas(QPoint(0, 0))
 
     def __mouse_move_in_canvas(self, point: QPoint) -> None:
         self.__info.setText(f"x: {point.x()}, y: {point.y()}")
 
+    def __open(self) -> None:
+        fullpath, *_ = QFileDialog.getOpenFileName(
+            self, "Open Canvas", "", "PNG (*.png)"
+        )
+        if not fullpath:
+            return
+
+        self.__canvas.load(fullpath)
+
+    def __save(self) -> None:
+        filename = f"Canvas {self.__current_canvas + 1}"
+        fullpath, *_ = QFileDialog.getSaveFileName(
+            self, "Save Canvas", filename, "PNG (*.png)"
+        )
+        if not fullpath:
+            return
+
+        self.__current_canvas += 1
+        self.__canvas.image.save(fullpath)
+
 
 class ModelInfo(QGroupBox):
     __serializer: ModelSerializer
+    __current_model: int
     __threshold: float
     __variants: tuple[str, str]
     __model: Model
@@ -222,6 +263,7 @@ class ModelInfo(QGroupBox):
 
         self.__threshold = threshold
         self.__variants = variants
+        self.__current_model = 0
 
         self.__serializer = serializer
         self.__model = serializer.build()
@@ -259,6 +301,12 @@ class ModelInfo(QGroupBox):
         main_layout.addWidget(self.__info)
         main_layout.addWidget(self.__raw_info)
         main_layout.addLayout(layout)
+
+        open_shrotcut = QShortcut(QKeySequence("Ctrl+Shift+O"), self)
+        open_shrotcut.activated.connect(self.__open)
+
+        save_shrotcut = QShortcut(QKeySequence("Ctrl+Shift+S"), self)
+        save_shrotcut.activated.connect(self.__save)
 
         self.setLayout(main_layout)
 
@@ -300,6 +348,26 @@ class ModelInfo(QGroupBox):
         self.__model.evaluate(self.__last_input, [expected_output])
 
         self.predict(self.__last_input)
+
+    def __open(self) -> None:
+        fullpath, *_ = QFileDialog.getOpenFileName(
+            self, "Open Model", "", "Model (*.mdl)"
+        )
+        if not fullpath:
+            return
+
+        self.__model = self.__serializer.load(fullpath)
+
+    def __save(self) -> None:
+        filename = f"Model {self.__current_model + 1}"
+        fullpath, *_ = QFileDialog.getSaveFileName(
+            self, "Save Model", filename, "Model (*.mdl)"
+        )
+        if not fullpath:
+            return
+
+        self.__current_model += 1
+        self.__serializer.save(fullpath, self.__model)
 
 
 class MainWindow(QMainWindow):

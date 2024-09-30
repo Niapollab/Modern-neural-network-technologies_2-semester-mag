@@ -14,11 +14,11 @@ class RosenblattNeuron(Model):
 
 
 class RosenblattNeuronSerializer(ModelSerializer[RosenblattNeuron]):
-    def load(self) -> RosenblattNeuron:
-        raise NotImplementedError()
+    def load(self, filename: str) -> RosenblattNeuron:
+        return RosenblattNeuron()
 
-    def save(self, model: RosenblattNeuron) -> None:
-        raise NotImplementedError()
+    def save(self, filename: str, model: RosenblattNeuron) -> None:
+        pass
 
     def build(self) -> RosenblattNeuron:
         return RosenblattNeuron()

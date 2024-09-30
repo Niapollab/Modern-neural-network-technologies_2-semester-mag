@@ -23,13 +23,13 @@ class Model(Predictor, Evaluator):
 
 class Loader[T](ABC):
     @abstractmethod
-    def load(self) -> T:
+    def load(self, filename: str) -> T:
         pass
 
 
 class Saver[T](ABC):
     @abstractmethod
-    def save(self, model: T) -> None:
+    def save(self, filename: str, model: T) -> None:
         pass
 
 
