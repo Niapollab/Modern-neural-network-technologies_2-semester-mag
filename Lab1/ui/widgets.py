@@ -1,8 +1,6 @@
 from core import Model, ModelSerializer
-from PyQt6.QtCore import pyqtBoundSignal, pyqtSignal
-from PyQt6.QtCore import Qt, QTimer, QPoint
-from PyQt6.QtGui import QImage, QPen, QPainter
-from PyQt6.QtGui import QMouseEvent, QPaintEvent, QKeyEvent
+from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtBoundSignal, pyqtSignal
+from PyQt6.QtGui import QImage, QPen, QPainter, QMouseEvent, QPaintEvent, QShortcut, QKeySequence
 from PyQt6.QtWidgets import (
     QWidget,
     QMainWindow,
@@ -46,6 +44,12 @@ class Canvas(QWidget):
         self.__timer = QTimer(self)
         self.__timer.setInterval(no_paint_millisecond)
         self.__timer.timeout.connect(self.__timeout)
+
+        undo_shrotcut = QShortcut(QKeySequence("Ctrl+Z"), self)
+        undo_shrotcut.activated.connect(self.__undo)
+
+        redo_shrotcut = QShortcut(QKeySequence("Ctrl+Y"), self)
+        redo_shrotcut.activated.connect(self.__redo)
 
         self.clear()
 
@@ -126,11 +130,11 @@ class Canvas(QWidget):
         painter = QPainter(self)
         painter.drawImage(self.rect(), self.__scaled_image)
 
-    def undo(self) -> None:
+    def __undo(self) -> None:
         self.__scaled_image = self.__upscale(self.__history.undo())
         self.update()
 
-    def redo(self) -> None:
+    def __redo(self) -> None:
         self.__scaled_image = self.__upscale(self.__history.redo())
         self.update()
 
@@ -327,18 +331,6 @@ class MainWindow(QMainWindow):
         widget.setLayout(layout)
 
         self.setCentralWidget(widget)
-
-    def keyPressEvent(self, event: QKeyEvent) -> None:
-        if (
-            event.key() == Qt.Key.Key_Z
-            and event.modifiers() == Qt.KeyboardModifier.ControlModifier
-        ):
-            self.__canvas.undo()
-        elif (
-            event.key() == Qt.Key.Key_Y
-            and event.modifiers() == Qt.KeyboardModifier.ControlModifier
-        ):
-            self.__canvas.redo()
 
     def __predict(self) -> None:
         self.__model_info.predict(self.__canvas.features)
