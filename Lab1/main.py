@@ -3,12 +3,14 @@ from ui import Application, MainWindow
 
 
 if __name__ == "__main__":
+    SIZE = 64
+
     app = Application()
-    model_serializer = RosenblattNeuronSerializer()
+    model_serializer = RosenblattNeuronSerializer(SIZE**2, bias=0)
 
     main_window = MainWindow(
         serializer=model_serializer,
-        shape=(64, 64),
+        shape=(SIZE, SIZE),
         no_paint_millisecond=750,
         scale_factor=4,
         threshold=0.5,

@@ -9,5 +9,7 @@ name = "native"
 crate-type = ["cdylib"]
 
 [dependencies]
+bincode = "1.3.3"
 pyo3 = "0.22.0"
 rand = "0.8.5"
+serde = { version = "1.0.210", features = ["derive"] }
