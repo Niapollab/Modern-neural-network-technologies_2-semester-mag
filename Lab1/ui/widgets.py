@@ -7,7 +7,7 @@ from PyQt6.QtGui import (
     QMouseEvent,
     QPaintEvent,
     QShortcut,
-    QKeySequence
+    QKeySequence,
 )
 from PyQt6.QtWidgets import (
     QWidget,
@@ -229,7 +229,7 @@ class CanvasWithInfo(QGroupBox):
         self.__canvas.load(fullpath)
 
     def __save(self) -> None:
-        filename = f"Canvas {self.__current_canvas + 1}"
+        filename = f"Canvas {self.__current_canvas + 1}.png"
         fullpath, *_ = QFileDialog.getSaveFileName(
             self, "Save Canvas", filename, "PNG (*.png)"
         )
@@ -359,7 +359,7 @@ class ModelInfo(QGroupBox):
         self.__model = self.__serializer.load(fullpath)
 
     def __save(self) -> None:
-        filename = f"Model {self.__current_model + 1}"
+        filename = f"Model {self.__current_model + 1}.mdl"
         fullpath, *_ = QFileDialog.getSaveFileName(
             self, "Save Model", filename, "Model (*.mdl)"
         )
@@ -373,7 +373,6 @@ class ModelInfo(QGroupBox):
 class MainWindow(QMainWindow):
     __canvas: Canvas
     __model_info: ModelInfo
-    __shape: tuple[int, int]
 
     def __init__(
         self,
