@@ -1,4 +1,4 @@
-from mock import RosenblattNeuronSerializer
+from native import RosenblattNeuronSerializer
 from ui import Application, MainWindow
 
 
